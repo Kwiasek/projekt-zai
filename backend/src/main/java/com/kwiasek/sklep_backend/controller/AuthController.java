@@ -1,7 +1,7 @@
 package com.kwiasek.sklep_backend.controller;
 
-import com.kwiasek.sklep_backend.model.AuthenticationRequest;
-import com.kwiasek.sklep_backend.model.Role;
+import com.kwiasek.sklep_backend.dto.AuthenticationRequest;
+import com.kwiasek.sklep_backend.model.UserRole;
 import com.kwiasek.sklep_backend.model.User;
 import com.kwiasek.sklep_backend.repository.UserRepository;
 import com.kwiasek.sklep_backend.service.CustomUserDetailsService;
@@ -37,7 +37,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        user.setRole(Role.ROLE_USER);
+        user.setRole(UserRole.ROLE_USER);
         try {
             userRepository.save(user);
             return ResponseEntity.ok("User registered successfully");

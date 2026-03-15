@@ -19,5 +19,9 @@ public class User {
     private String username;
     private String password;
     @Enumerated(EnumType.STRING)
-    private Role role;
+    private UserRole role;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    @PrimaryKeyJoinColumn
+    private UserDetails userDetails;
 }

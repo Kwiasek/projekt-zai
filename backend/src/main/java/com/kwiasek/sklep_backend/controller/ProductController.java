@@ -14,6 +14,7 @@ import java.net.URI;
 import java.util.Optional;
 
 @RestController
+@RequestMapping("/api")
 public class ProductController {
 
     @Autowired
