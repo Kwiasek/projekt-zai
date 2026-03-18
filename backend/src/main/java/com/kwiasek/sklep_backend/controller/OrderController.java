@@ -8,6 +8,8 @@ import com.kwiasek.sklep_backend.repository.OrderRepository;
 import com.kwiasek.sklep_backend.repository.ProductRepository;
 import com.kwiasek.sklep_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +33,7 @@ public class OrderController {
     private ProductRepository productRepository;
 
     @GetMapping("/orders")
-    public ResponseEntity<Iterable<Order>> getOrders(Principal principal) {
+    public ResponseEntity<Page<Order>> getOrders(Pageable p, Principal principal) {
         User user = userRepository.findByUsername(principal.getName());
         if (user == null) {
             return ResponseEntity.badRequest().build();
@@ -39,11 +41,11 @@ public class OrderController {
         
         // If the user is an admin, return all orders in the system
         if ("ROLE_ADMIN".equals(user.getRole().name())) {
-            return ResponseEntity.ok(orderRepository.findAll());
+            return ResponseEntity.ok(orderRepository.findAll(p));
         }
         
         // Otherwise, return only the orders belonging to this specific user
-        return ResponseEntity.ok(orderRepository.findAllByUser(user));
+        return ResponseEntity.ok(orderRepository.findAllByUser(user, p));
     }
     
     @PostMapping("/order")

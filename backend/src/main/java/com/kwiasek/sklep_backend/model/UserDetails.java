@@ -1,5 +1,6 @@
 package com.kwiasek.sklep_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,7 +19,6 @@ public class UserDetails {
 
     private String firstName;
     private String lastName;
-    private String address;
     private String phoneNumber;
     @Column(unique = true)
     private String email;
@@ -27,5 +27,6 @@ public class UserDetails {
     @OneToOne
     @MapsId
     @JoinColumn(name = "id")
+    @JsonIgnore
     private User user;
 }

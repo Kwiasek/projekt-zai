@@ -1,5 +1,6 @@
 -- Make sure to provide a BCrypt hashed password here.
 -- In this example, the hash corresponds to the password "password"
+
 INSERT INTO users (username, password, role)
 VALUES ('admin', '$2a$12$ki/kpq5xA63WAvbYMggf/uOu5R8M7nEXeDutF1Zfp.o9rc7r9FjrC', 'ROLE_ADMIN');
 

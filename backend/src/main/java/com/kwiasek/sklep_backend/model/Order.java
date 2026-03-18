@@ -1,5 +1,6 @@
 package com.kwiasek.sklep_backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -19,6 +20,7 @@ public class Order {
     
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"role"}) // Ignore role in the order response. Password and userDetails are ignored in User entity.
     private User user;
     
     @ManyToMany
