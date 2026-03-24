@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -23,21 +24,25 @@ public class UserController {
     @GetMapping("/user")
     public ResponseEntity<User> getUser(Principal principal) {
         // principal.getName() returns the username extracted from the JWT
-        User user = userRepository.findByUsername(principal.getName());
-        if (user == null) {
+        Optional<User> resp = userRepository.findByUsername(principal.getName());
+        if (resp.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
+
+        User user = resp.get();
 
         return ResponseEntity.ok(user);
     }
 
     @PutMapping("/user/details")
     public ResponseEntity<UserDetails> updateUserDetails(@RequestBody UserDetails userDetails, Principal principal) {
-        User user = userRepository.findByUsername(principal.getName());
+        Optional<User> resp = userRepository.findByUsername(principal.getName());
 
-        if (user == null) {
+        if (resp.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
+
+        User user = resp.get();
 
         UserDetails existingDetails = user.getUserDetails();
         if (existingDetails != null) {

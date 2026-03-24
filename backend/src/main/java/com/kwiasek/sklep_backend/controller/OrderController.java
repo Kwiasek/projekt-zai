@@ -15,9 +15,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import javax.swing.text.html.Option;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api")
@@ -33,30 +35,32 @@ public class OrderController {
     private ProductRepository productRepository;
 
     @GetMapping("/orders")
-    public ResponseEntity<Page<Order>> getOrders(Pageable p, Principal principal) {
-        User user = userRepository.findByUsername(principal.getName());
-        if (user == null) {
+    public ResponseEntity<List<Order>> getOrders(Principal principal) {
+        Optional<User> resp = userRepository.findByUsername(principal.getName());
+        if (resp.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        
+
+        User user = resp.get();
+
         // If the user is an admin, return all orders in the system
         if ("ROLE_ADMIN".equals(user.getRole().name())) {
-            return ResponseEntity.ok(orderRepository.findAll(p));
+            return ResponseEntity.ok(orderRepository.findAll());
         }
         
         // Otherwise, return only the orders belonging to this specific user
-        return ResponseEntity.ok(orderRepository.findAllByUser(user, p));
+        return ResponseEntity.ok(orderRepository.findByUserId(user.getId()));
     }
     
     @PostMapping("/order")
     public ResponseEntity<?> placeAnOrder(@RequestBody PlaceOrderRequest orderRequest, Principal principal) {
         // principal.getName() returns the username extracted from the JWT
-        User user = userRepository.findByUsername(principal.getName());
-        if (user == null) {
+        Optional<User> resp = userRepository.findByUsername(principal.getName());
+        if (resp.isEmpty()) {
             // This should not happen if the JWT filter is working, but it's a good safeguard.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
         }
-
+        User user = resp.get();
         // Fetch all products from the database based on the IDs in the request
         List<Product> products = productRepository.findAllById(orderRequest.getProductIds());
 
