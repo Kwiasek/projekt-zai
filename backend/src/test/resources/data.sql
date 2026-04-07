@@ -1,1 +1,0 @@
-INSERT INTO PRODUCTS (id, name, description, price) values ( 1, "produkt1", "Opis1", 123.45 );
