@@ -21,6 +21,11 @@ public class Product {
     private String description;
     private Float price;
 
+    @ElementCollection
+    @CollectionTable(name = "product_images", joinColumns = @JoinColumn(name = "product_id"))
+    @Column(name = "image_url")
+    private List<String> imageUrls;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<ProductOpinion> opinions;
