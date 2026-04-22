@@ -1,5 +1,6 @@
 package com.kwiasek.sklep_backend.controller;
 
+import com.kwiasek.sklep_backend.dto.UserResponse;
 import com.kwiasek.sklep_backend.model.User;
 import com.kwiasek.sklep_backend.model.UserDetails;
 import com.kwiasek.sklep_backend.repository.UserDetailsRepository;
@@ -22,7 +23,7 @@ public class UserController {
     private UserDetailsRepository userDetailsRepository;
 
     @GetMapping("/user")
-    public ResponseEntity<User> getUser(Principal principal) {
+    public ResponseEntity<UserResponse> getUser(Principal principal) {
         // principal.getName() returns the username extracted from the JWT
         Optional<User> resp = userRepository.findByUsername(principal.getName());
         if (resp.isEmpty()) {
@@ -31,7 +32,7 @@ public class UserController {
 
         User user = resp.get();
 
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(new UserResponse(user));
     }
 
     @PutMapping("/user/details")
