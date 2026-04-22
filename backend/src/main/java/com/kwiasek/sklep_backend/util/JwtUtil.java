@@ -34,13 +34,28 @@ public class JwtUtil {
     }
 
     public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        try {
+            return extractExpiration(token).before(new Date());
+        } catch (ExpiredJwtException e) {
+            return true;
+        }
     }
 
-    public String generateToken(UserDetails userDetails) {
+    public String generateAccessToken(UserDetails userDetails) {
+        // 15 minut
+        long ACCESS_TOKEN_EXPIRATION = 1000 * 60 * 15;
         return Jwts.builder().subject(userDetails.getUsername())
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10))
+                .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                .signWith(secretKey).compact();
+    }
+
+    public String generateRefreshToken(UserDetails userDetails) {
+        // 7 dni
+        long REFRESH_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24 * 7;
+        return Jwts.builder().subject(userDetails.getUsername())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRATION))
                 .signWith(secretKey).compact();
     }
 
