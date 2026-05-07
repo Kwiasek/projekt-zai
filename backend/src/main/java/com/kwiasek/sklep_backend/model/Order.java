@@ -20,14 +20,12 @@ public class Order {
     
     @ManyToOne
     @JoinColumn(name = "user_id")
-    @JsonIgnoreProperties({"role"}) // Ignore role in the order response. Password and userDetails are ignored in User entity.
+    @JsonIgnoreProperties({"role"})
     private User user;
     
-    @ManyToMany
-    @JoinTable(
-            name = "order_products",
-            joinColumns = @JoinColumn(name = "order_id"),
-            inverseJoinColumns = @JoinColumn(name = "product_id")
-    )
-    private List<Product> products;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    private List<OrderItem> items;
+
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status;
 }

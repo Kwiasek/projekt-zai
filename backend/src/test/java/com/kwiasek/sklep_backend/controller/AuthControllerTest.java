@@ -13,6 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -63,7 +65,9 @@ public class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        String token = result.getResponse().getContentAsString();
+        String response = result.getResponse().getContentAsString();
+        Map<String, String> body = objectMapper.readValue(response, Map.class);
+        String token = body.get("accessToken");
 
         assertThat(token).isNotNull();
 
@@ -88,9 +92,9 @@ public class AuthControllerTest {
                         .andExpect(status().isConflict())
                         .andReturn();
 
-        String message = result.getResponse().getContentAsString();
-        assertThat(message).isNotNull();
-        assertThat(message).isEqualTo("Error: User already exists.");
+        String response = result.getResponse().getContentAsString();
+        Map<String, String> body = objectMapper.readValue(response, Map.class);
+        assertThat(body.get("error")).isEqualTo("User already exists.");
     }
 
     @Test
@@ -114,10 +118,8 @@ public class AuthControllerTest {
                 .andExpect(status().isUnauthorized())
                 .andReturn();
 
-        String message = result.getResponse().getContentAsString();
-
-        assertThat(message).isNotNull();
-
-        assertThat(message).isEqualTo("Error: Invalid username or password.");
+        String response = result.getResponse().getContentAsString();
+        Map<String, String> body = objectMapper.readValue(response, Map.class);
+        assertThat(body.get("error")).isEqualTo("Invalid username or password.");
     }
 }

@@ -6,5 +6,5 @@ import java.util.List;
 
 @Data
 public class PlaceOrderRequest {
-    private List<Long> productIds;
+    private List<OrderItemRequest> items;
 }

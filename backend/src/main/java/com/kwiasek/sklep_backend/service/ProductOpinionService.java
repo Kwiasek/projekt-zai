@@ -53,7 +53,8 @@ public class ProductOpinionService {
     private boolean hasUserPurchasedProduct(User user, Product product) {
         List<Order> userOrders = orderRepository.findByUserId(user.getId());
         return userOrders.stream()
-                .anyMatch(order -> order.getProducts().contains(product));
+                .anyMatch(order -> order.getItems().stream()
+                        .anyMatch(item -> item.getProduct().equals(product)));
     }
 
     private boolean hasUserAlreadyReviewedProduct(User user, Product product) {

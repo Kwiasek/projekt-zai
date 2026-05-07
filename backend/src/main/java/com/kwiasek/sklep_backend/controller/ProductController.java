@@ -21,7 +21,17 @@ public class ProductController {
     private ProductRepository productRepository;
 
     @GetMapping("/products")
-    public ResponseEntity<Page<Product>> getProductsList(Pageable p) {
+    public ResponseEntity<Page<Product>> getProductsList(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Long categoryId,
+            Pageable p) {
+        if (name != null && categoryId != null) {
+            return ResponseEntity.ok(productRepository.findByNameContainingIgnoreCaseAndCategoryId(name, categoryId, p));
+        } else if (name != null) {
+            return ResponseEntity.ok(productRepository.findByNameContainingIgnoreCase(name, p));
+        } else if (categoryId != null) {
+            return ResponseEntity.ok(productRepository.findByCategoryId(categoryId, p));
+        }
         return ResponseEntity.ok(productRepository.findAll(p));
     }
 
@@ -52,6 +62,8 @@ public class ProductController {
             updatedProduct.setName(product.getName());
             updatedProduct.setDescription(product.getDescription());
             updatedProduct.setPrice(product.getPrice());
+            updatedProduct.setStockQuantity(product.getStockQuantity());
+            updatedProduct.setCategory(product.getCategory());
             productRepository.save(updatedProduct);
             return ResponseEntity.ok(updatedProduct);
         } else {

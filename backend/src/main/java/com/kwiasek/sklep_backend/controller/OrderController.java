@@ -1,9 +1,7 @@
 package com.kwiasek.sklep_backend.controller;
 
 import com.kwiasek.sklep_backend.dto.PlaceOrderRequest;
-import com.kwiasek.sklep_backend.model.Order;
-import com.kwiasek.sklep_backend.model.Product;
-import com.kwiasek.sklep_backend.model.User;
+import com.kwiasek.sklep_backend.model.*;
 import com.kwiasek.sklep_backend.repository.OrderRepository;
 import com.kwiasek.sklep_backend.repository.ProductRepository;
 import com.kwiasek.sklep_backend.repository.UserRepository;
@@ -12,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
@@ -19,6 +18,7 @@ import javax.swing.text.html.Option;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -53,31 +53,47 @@ public class OrderController {
     }
     
     @PostMapping("/order")
+    @Transactional
     public ResponseEntity<?> placeAnOrder(@RequestBody PlaceOrderRequest orderRequest, Principal principal) {
-        // principal.getName() returns the username extracted from the JWT
         Optional<User> resp = userRepository.findByUsername(principal.getName());
         if (resp.isEmpty()) {
-            // This should not happen if the JWT filter is working, but it's a good safeguard.
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User not found");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
         }
         User user = resp.get();
-        // Fetch all products from the database based on the IDs in the request
-        List<Product> products = productRepository.findAllById(orderRequest.getProductIds());
 
-        // Optional but recommended: Check if all requested products were found.
-        // This prevents placing an order for products that don't exist.
-        if (products.size() != orderRequest.getProductIds().size()) {
-            return ResponseEntity.badRequest().body("One or more product IDs are invalid.");
-        }
-
-        // Create a new order and set its properties
         Order newOrder = new Order();
         newOrder.setUser(user);
-        newOrder.setProducts(products);
+        newOrder.setStatus(OrderStatus.PENDING);
+        
+        List<OrderItem> orderItems = new java.util.ArrayList<>();
+        
+        for (com.kwiasek.sklep_backend.dto.OrderItemRequest itemReq : orderRequest.getItems()) {
+            Optional<Product> productOpt = productRepository.findById(itemReq.getProductId());
+            if (productOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Product not found: " + itemReq.getProductId()));
+            }
+            
+            Product product = productOpt.get();
+            
+            if (product.getStockQuantity() == null || product.getStockQuantity() < itemReq.getQuantity()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Insufficient stock for product: " + product.getName()));
+            }
+            
+            // Deduct stock
+            product.setStockQuantity(product.getStockQuantity() - itemReq.getQuantity());
+            productRepository.save(product);
+            
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrder(newOrder);
+            orderItem.setProduct(product);
+            orderItem.setPriceAtPurchase(product.getPrice());
+            orderItem.setQuantity(itemReq.getQuantity());
+            orderItems.add(orderItem);
+        }
 
+        newOrder.setItems(orderItems);
         Order savedOrder = orderRepository.save(newOrder);
 
-        // Return 201 Created with the proper Location header
         URI savedOrderUri = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
