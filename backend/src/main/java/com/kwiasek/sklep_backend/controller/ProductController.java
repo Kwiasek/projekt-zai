@@ -1,17 +1,21 @@
 package com.kwiasek.sklep_backend.controller;
 
+import com.kwiasek.sklep_backend.dto.ProductDTO;
+import com.kwiasek.sklep_backend.dto.ProductImageDTO;
 import com.kwiasek.sklep_backend.model.Product;
 import com.kwiasek.sklep_backend.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.net.URI;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -21,41 +25,49 @@ public class ProductController {
     private ProductRepository productRepository;
 
     @GetMapping("/products")
-    public ResponseEntity<Page<Product>> getProductsList(
+    @Transactional(readOnly = true)
+    public ResponseEntity<Page<ProductDTO>> getProductsList(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Long categoryId,
             Pageable p) {
+        Page<Product> products;
         if (name != null && categoryId != null) {
-            return ResponseEntity.ok(productRepository.findByNameContainingIgnoreCaseAndCategoryId(name, categoryId, p));
+            products = productRepository.findByNameContainingIgnoreCaseAndCategoryId(name, categoryId, p);
         } else if (name != null) {
-            return ResponseEntity.ok(productRepository.findByNameContainingIgnoreCase(name, p));
+            products = productRepository.findByNameContainingIgnoreCase(name, p);
         } else if (categoryId != null) {
-            return ResponseEntity.ok(productRepository.findByCategoryId(categoryId, p));
+            products = productRepository.findByCategoryId(categoryId, p);
+        } else {
+            products = productRepository.findAll(p);
         }
-        return ResponseEntity.ok(productRepository.findAll(p));
+        return ResponseEntity.ok(products.map(this::convertToDto));
     }
 
     @GetMapping("/product/{id}")
-    public ResponseEntity<Product> getProduct(@PathVariable Long id) {
+    @Transactional(readOnly = true)
+    public ResponseEntity<ProductDTO> getProduct(@PathVariable Long id) {
         Optional<Product> product = productRepository.findById(id);
-        return product.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        return product.map(p -> ResponseEntity.ok(convertToDto(p)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/product")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Product> addProduct(@RequestBody Product product) {
+    @Transactional
+    public ResponseEntity<ProductDTO> addProduct(@RequestBody Product product) {
         Product savedProduct = productRepository.save(product);
         URI savedProductUri = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(savedProduct.getId())
                 .toUri();
-        return ResponseEntity.created(savedProductUri).body(savedProduct);
+        return ResponseEntity.created(savedProductUri).body(convertToDto(savedProduct));
     }
 
     @PutMapping("/product/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Product> updateProduct(@PathVariable Long id, @RequestBody Product product) {
+    @Transactional
+    public ResponseEntity<ProductDTO> updateProduct(@PathVariable Long id, @RequestBody Product product) {
         Optional<Product> existingProduct = productRepository.findById(id);
         if (existingProduct.isPresent()) {
             Product updatedProduct = existingProduct.get();
@@ -65,7 +77,7 @@ public class ProductController {
             updatedProduct.setStockQuantity(product.getStockQuantity());
             updatedProduct.setCategory(product.getCategory());
             productRepository.save(updatedProduct);
-            return ResponseEntity.ok(updatedProduct);
+            return ResponseEntity.ok(convertToDto(updatedProduct));
         } else {
             return ResponseEntity.notFound().build();
         }
@@ -73,6 +85,7 @@ public class ProductController {
 
     @DeleteMapping("/product/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
         Optional<Product> product = productRepository.findById(id);
         if (product.isPresent()) {
@@ -81,5 +94,21 @@ public class ProductController {
         } else {
             return ResponseEntity.notFound().build();
         }
+    }
+
+    private ProductDTO convertToDto(Product product) {
+        ProductDTO dto = new ProductDTO();
+        dto.setId(product.getId());
+        dto.setName(product.getName());
+        dto.setDescription(product.getDescription());
+        dto.setPrice(product.getPrice());
+        dto.setStockQuantity(product.getStockQuantity());
+        dto.setCategory(product.getCategory());
+        if (product.getImages() != null) {
+            dto.setImages(product.getImages().stream()
+                    .map(img -> new ProductImageDTO(img.getId(), img.getContentType(), img.getDisplayOrder()))
+                    .collect(Collectors.toList()));
+        }
+        return dto;
     }
 }

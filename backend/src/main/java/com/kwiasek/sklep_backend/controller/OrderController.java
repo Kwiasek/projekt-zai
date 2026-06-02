@@ -35,6 +35,7 @@ public class OrderController {
     private ProductRepository productRepository;
 
     @GetMapping("/orders")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Order>> getOrders(Principal principal) {
         Optional<User> resp = userRepository.findByUsername(principal.getName());
         if (resp.isEmpty()) {

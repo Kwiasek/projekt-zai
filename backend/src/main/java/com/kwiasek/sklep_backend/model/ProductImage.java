@@ -21,7 +21,6 @@ public class ProductImage {
     private Product product;
 
     @Lob
-    @Column(columnDefinition = "LONGBLOB") // Ensure enough space for binary data in H2/MySQL
     private byte[] imageData;
 
     private String contentType;
