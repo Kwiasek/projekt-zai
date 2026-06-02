@@ -120,7 +120,9 @@ export default function Navbar() {
                 </DropdownMenuItem>
                 {user?.role === "ROLE_ADMIN" && (
                   <DropdownMenuItem asChild>
-                    <Link href="/admin/products" className="cursor-pointer">Manage Inventory</Link>
+                    <Link href="/admin" className="cursor-pointer font-semibold text-primary">
+                      Admin Dashboard
+                    </Link>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />

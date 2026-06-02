@@ -35,6 +35,14 @@ public class UserController {
         return ResponseEntity.ok(new UserResponse(user));
     }
 
+    @GetMapping("/users")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll().stream()
+                .map(UserResponse::new)
+                .collect(java.util.stream.Collectors.toList()));
+    }
+
     @PutMapping("/user/details")
     public ResponseEntity<UserDetails> updateUserDetails(@RequestBody UserDetails userDetails, Principal principal) {
         Optional<User> resp = userRepository.findByUsername(principal.getName());

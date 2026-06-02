@@ -80,7 +80,7 @@ export default function ProfilePage() {
     };
 
     loadData();
-  }, [user, accessToken, router]);
+  }, [user, accessToken, router, _hasHydrated]);
 
   const handleUpdateDetails = async (e: React.FormEvent) => {
     e.preventDefault();
