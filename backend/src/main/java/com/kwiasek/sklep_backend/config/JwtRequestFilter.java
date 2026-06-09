@@ -31,9 +31,15 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String username = null;
         String token = null;
 
-        if (header != null && header.startsWith("Bearer ")) {
-            token = header.substring(7);
-            username = jwtUtil.extractUsername(token);
+        try {
+            if (header != null && header.startsWith("Bearer ")) {
+                token = header.substring(7);
+                username = jwtUtil.extractUsername(token);
+            }
+        } catch (Exception e) {
+            // Token is expired, malformed or invalid - we just ignore it here
+            // and let Spring Security handle unauthorized access later in the chain.
+            logger.warn("JWT validation failed: " + e.getMessage());
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {

@@ -17,5 +17,6 @@ public class ProductDTO {
     private Float price;
     private Integer stockQuantity;
     private Category category;
+    private java.util.Map<String, String> attributes;
     private List<ProductImageDTO> images;
 }

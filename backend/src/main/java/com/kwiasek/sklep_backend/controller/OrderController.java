@@ -1,25 +1,24 @@
 package com.kwiasek.sklep_backend.controller;
 
-import com.kwiasek.sklep_backend.dto.PlaceOrderRequest;
+import com.kwiasek.sklep_backend.dto.*;
 import com.kwiasek.sklep_backend.model.*;
 import com.kwiasek.sklep_backend.repository.OrderRepository;
 import com.kwiasek.sklep_backend.repository.ProductRepository;
 import com.kwiasek.sklep_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import javax.swing.text.html.Option;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -36,21 +35,26 @@ public class OrderController {
 
     @GetMapping("/orders")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<Order>> getOrders(Principal principal) {
+    public ResponseEntity<List<OrderDTO>> getOrders(Principal principal) {
         Optional<User> resp = userRepository.findByUsername(principal.getName());
         if (resp.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
 
         User user = resp.get();
+        List<Order> orders;
 
         // If the user is an admin, return all orders in the system
-        if ("ROLE_ADMIN".equals(user.getRole().name())) {
-            return ResponseEntity.ok(orderRepository.findAll());
+        if (UserRole.ROLE_ADMIN.equals(user.getRole())) {
+            orders = orderRepository.findAll();
+        } else {
+            // Otherwise, return only the orders belonging to this specific user
+            orders = orderRepository.findByUserId(user.getId());
         }
         
-        // Otherwise, return only the orders belonging to this specific user
-        return ResponseEntity.ok(orderRepository.findByUserId(user.getId()));
+        return ResponseEntity.ok(orders.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList()));
     }
     
     @PostMapping("/order")
@@ -64,7 +68,16 @@ public class OrderController {
 
         Order newOrder = new Order();
         newOrder.setUser(user);
-        newOrder.setStatus(OrderStatus.PENDING);
+        
+        if (orderRequest.getStatus() != null) {
+            try {
+                newOrder.setStatus(OrderStatus.valueOf(orderRequest.getStatus()));
+            } catch (IllegalArgumentException e) {
+                newOrder.setStatus(OrderStatus.PENDING);
+            }
+        } else {
+            newOrder.setStatus(OrderStatus.PENDING);
+        }
         
         List<OrderItem> orderItems = new java.util.ArrayList<>();
         
@@ -101,6 +114,66 @@ public class OrderController {
                 .buildAndExpand(savedOrder.getId())
                 .toUri();
 
-        return ResponseEntity.created(savedOrderUri).body(savedOrder);
+        return ResponseEntity.created(savedOrderUri).body(convertToDto(savedOrder));
+    }
+
+    @PutMapping("/order/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<OrderDTO> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> statusMap) {
+        Optional<Order> orderOpt = orderRepository.findById(id);
+        if (orderOpt.isPresent()) {
+            Order order = orderOpt.get();
+            String statusStr = statusMap.get("status");
+            try {
+                order.setStatus(OrderStatus.valueOf(statusStr));
+                orderRepository.save(order);
+                return ResponseEntity.ok(convertToDto(order));
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().build();
+            }
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    private OrderDTO convertToDto(Order order) {
+        OrderDTO dto = new OrderDTO();
+        dto.setId(order.getId());
+        dto.setUser(new UserResponse(order.getUser()));
+        dto.setStatus(order.getStatus());
+        dto.setCreatedAt(order.getCreatedAt());
+        if (order.getItems() != null) {
+            dto.setItems(order.getItems().stream()
+                    .map(this::convertToDto)
+                    .collect(Collectors.toList()));
+        }
+        return dto;
+    }
+
+    private OrderItemDTO convertToDto(OrderItem item) {
+        OrderItemDTO dto = new OrderItemDTO();
+        dto.setId(item.getId());
+        dto.setPriceAtPurchase(item.getPriceAtPurchase());
+        dto.setQuantity(item.getQuantity());
+        dto.setProduct(convertToDto(item.getProduct()));
+        return dto;
+    }
+
+    private ProductDTO convertToDto(Product product) {
+        ProductDTO dto = new ProductDTO();
+        dto.setId(product.getId());
+        dto.setName(product.getName());
+        dto.setDescription(product.getDescription());
+        dto.setPrice(product.getPrice());
+        dto.setStockQuantity(product.getStockQuantity());
+        dto.setCategory(product.getCategory());
+        dto.setAttributes(product.getAttributes());
+        if (product.getImages() != null) {
+            dto.setImages(product.getImages().stream()
+                    .map(img -> new ProductImageDTO(img.getId(), img.getContentType(), img.getDisplayOrder()))
+                    .collect(Collectors.toList()));
+        }
+        return dto;
     }
 }

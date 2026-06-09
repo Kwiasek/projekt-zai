@@ -25,8 +25,8 @@ export const AuthStoreProvider = ({
   )
 }
 
-export const useAuthStore = <T,>(
-  selector: (store: AuthStore) => T,
+export const useAuthStore = <T = AuthStore,>(
+  selector: (store: AuthStore) => T = (state) => state as unknown as T,
 ): T => {
   const authStoreContext = useContext(AuthStoreContext)
   if (!authStoreContext) {

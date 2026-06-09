@@ -16,6 +16,7 @@ interface Product {
     id: number;
     name: string;
   };
+  attributes?: Record<string, string>;
   images?: {
     id: number;
     contentType: string;

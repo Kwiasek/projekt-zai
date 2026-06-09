@@ -17,9 +17,9 @@ import {
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { useState } from "react"
-import { fetchApi } from "@/lib/fetchApi"
 import { useRouter } from "next/navigation"
 import { useAuthStore } from "./auth-store-provider"
+import { useApi } from "@/lib/useApi"
 
 export function LoginForm({
   className,
@@ -35,6 +35,7 @@ export function LoginForm({
   );
   
   const router = useRouter();
+  const api = useApi();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,13 +44,13 @@ export function LoginForm({
 
     try {
       // 1. Login
-      const { accessToken } = await fetchApi("/api/login", {
+      const { accessToken } = await api("/api/login", {
         method: "POST",
         body: JSON.stringify({ username, password })
       });
 
       // 2. Fetch User Details
-      const userData = await fetchApi("/api/user", {
+      const userData = await api("/api/user", {
         token: accessToken
       });
 

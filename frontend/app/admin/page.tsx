@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/fetchApi";
-import { useAuthStore } from "@/components/auth-store-provider";
+import { useApi } from "@/lib/useApi";
 import { 
   Card, 
   CardContent, 
@@ -45,12 +44,12 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const { accessToken } = useAuthStore();
+  const api = useApi();
 
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const data = await fetchApi("/api/admin/stats", { token: accessToken || undefined });
+        const data = await api("/api/admin/stats");
         setStats(data);
       } catch (e) {
         console.error("Failed to load dashboard stats", e);
@@ -60,7 +59,7 @@ export default function AdminDashboardPage() {
     };
 
     loadStats();
-  }, [accessToken]);
+  }, [api]);
 
   if (loading || !stats) {
     return (

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/components/auth-store-provider";
-import { fetchApi } from "@/lib/fetchApi";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Package, User as UserIcon, CheckCircle2 } from "lucide-react";
+import { useApi } from "@/lib/useApi"
 
 interface Order {
   id: number;
@@ -35,6 +35,7 @@ interface UserDetails {
 export default function ProfilePage() {
   const { user, accessToken, setAuth, _hasHydrated } = useAuthStore((state) => state);
   const router = useRouter();
+  const api = useApi();
   const [orders, setOrders] = useState<Order[]>([]);
   const [details, setDetails] = useState<UserDetails>({
     firstName: "",
@@ -46,20 +47,26 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !_hasHydrated) return;
 
     if (!user) {
       router.push("/login");
       return;
     }
+    // ... rest of useEffect
 
     const loadData = async () => {
       try {
         const [ordersData, userData] = await Promise.all([
-          fetchApi("/api/orders", { token: accessToken || undefined }),
-          fetchApi("/api/user", { token: accessToken || undefined })
+          api("/api/orders"),
+          api("/api/user")
         ]);
         
         setOrders(ordersData);
@@ -80,7 +87,7 @@ export default function ProfilePage() {
     };
 
     loadData();
-  }, [user, accessToken, router, _hasHydrated]);
+  }, [user, api, router, _hasHydrated, mounted]);
 
   const handleUpdateDetails = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,14 +95,13 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      await fetchApi("/api/user/details", {
+      await api("/api/user/details", {
         method: "PUT",
-        body: JSON.stringify(details),
-        token: accessToken || undefined
+        body: JSON.stringify(details)
       });
 
       // Update the global store with new user details
-      const freshUser = await fetchApi("/api/user", { token: accessToken || undefined });
+      const freshUser = await api("/api/user");
       setAuth(freshUser, accessToken!);
       
       setMessage("Profile updated successfully!");
@@ -106,7 +112,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) return (
+  if (!mounted || !_hasHydrated || loading) return (
     <div className="flex flex-col items-center justify-center min-h-[50vh]">
       <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
       <p className="text-muted-foreground">Loading your profile...</p>

@@ -26,6 +26,12 @@ public class Product {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ElementCollection
+    @CollectionTable(name = "product_attributes", joinColumns = @JoinColumn(name = "product_id"))
+    @MapKeyColumn(name = "attribute_key")
+    @Column(name = "attribute_value")
+    private java.util.Map<String, String> attributes;
+
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("displayOrder ASC")
     private List<ProductImage> images;

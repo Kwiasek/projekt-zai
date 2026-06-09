@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/fetchApi";
-import { useAuthStore } from "@/components/auth-store-provider";
+import { useApi } from "@/lib/useApi";
 import { 
   Card, 
   CardContent, 
@@ -34,12 +33,12 @@ interface User {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const { accessToken } = useAuthStore();
+  const api = useApi();
 
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        const data = await fetchApi("/api/users", { token: accessToken || undefined });
+        const data = await api("/api/users");
         setUsers(data);
       } catch (e) {
         console.error("Failed to load users", e);
@@ -49,7 +48,7 @@ export default function AdminUsersPage() {
     };
 
     loadUsers();
-  }, [accessToken]);
+  }, [api]);
 
   if (loading) {
     return (

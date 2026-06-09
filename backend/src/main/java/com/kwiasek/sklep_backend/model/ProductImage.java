@@ -21,6 +21,7 @@ public class ProductImage {
     private Product product;
 
     @Lob
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private byte[] imageData;
 
     private String contentType;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { fetchApi, API_BASE_URL } from "@/lib/fetchApi";
+import { useState, useEffect, useCallback } from "react";
+import { useApi } from "@/lib/useApi";
+import { API_BASE_URL } from "@/lib/fetchApi";
 import { useAuthStore } from "@/components/auth-store-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -40,6 +41,7 @@ interface Product {
   stockQuantity: number;
   description: string;
   category?: Category;
+  attributes?: Record<string, string>;
   images?: { id: number }[];
 }
 
@@ -51,7 +53,8 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { accessToken } = useAuthStore((state) => state);
+  const api = useApi();
+  const { accessToken } = useAuthStore();
 
   // Form State
   const [formData, setFormData] = useState({
@@ -62,11 +65,13 @@ export default function AdminProductsPage() {
     categoryId: ""
   });
 
-  const loadData = async () => {
+  const [formAttributes, setFormAttributes] = useState<{ key: string, value: string }[]>([]);
+
+  const loadData = useCallback(async () => {
     try {
       const [productsData, categoriesData] = await Promise.all([
-        fetchApi("/api/products?size=100"),
-        fetchApi("/api/categories")
+        api("/api/products?size=100"),
+        api("/api/categories")
       ]);
       setProducts(productsData.content);
       setCategories(categoriesData);
@@ -75,11 +80,11 @@ export default function AdminProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -90,6 +95,7 @@ export default function AdminProductsPage() {
       description: "",
       categoryId: ""
     });
+    setFormAttributes([]);
     setIsFormOpen(true);
   };
 
@@ -102,7 +108,27 @@ export default function AdminProductsPage() {
       description: product.description || "",
       categoryId: product.category?.id.toString() || ""
     });
+    
+    // Convert Record<string, string> to array for form
+    const attrs = product.attributes 
+      ? Object.entries(product.attributes).map(([key, value]) => ({ key, value }))
+      : [];
+    setFormAttributes(attrs);
     setIsFormOpen(true);
+  };
+
+  const addAttribute = () => {
+    setFormAttributes([...formAttributes, { key: "", value: "" }]);
+  };
+
+  const updateAttribute = (index: number, field: "key" | "value", value: string) => {
+    const newAttrs = [...formAttributes];
+    newAttrs[index][field] = value;
+    setFormAttributes(newAttrs);
+  };
+
+  const removeAttribute = (index: number) => {
+    setFormAttributes(formAttributes.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,17 +136,25 @@ export default function AdminProductsPage() {
     const endpoint = editingProduct ? `/api/product/${editingProduct.id}` : "/api/product";
     const method = editingProduct ? "PUT" : "POST";
 
+    // Convert array back to Record
+    const attributesRecord: Record<string, string> = {};
+    formAttributes.forEach(attr => {
+      if (attr.key.trim()) {
+        attributesRecord[attr.key.trim()] = attr.value;
+      }
+    });
+
     try {
-      await fetchApi(endpoint, {
+      await api(endpoint, {
         method,
         body: JSON.stringify({
           name: formData.name,
           price: parseFloat(formData.price),
           stockQuantity: parseInt(formData.stockQuantity),
           description: formData.description,
-          category: formData.categoryId ? { id: parseInt(formData.categoryId) } : null
-        }),
-        token: accessToken || undefined
+          category: formData.categoryId ? { id: parseInt(formData.categoryId) } : null,
+          attributes: attributesRecord
+        })
       });
       setIsFormOpen(false);
       loadData();
@@ -132,9 +166,8 @@ export default function AdminProductsPage() {
   const handleDelete = async (id: number) => {
     if (!confirm("Are you sure you want to delete this product?")) return;
     try {
-      await fetchApi(`/api/product/${id}`, {
-        method: "DELETE",
-        token: accessToken || undefined
+      await api(`/api/product/${id}`, {
+        method: "DELETE"
       });
       loadData();
     } catch (e) {
@@ -225,13 +258,19 @@ export default function AdminProductsPage() {
                 <Label htmlFor="category">Category</Label>
                 <select
                   id="category"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-9 w-full rounded-3xl border border-transparent bg-input/50 px-3 py-1 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 text-foreground appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 0.75rem center',
+                    backgroundSize: '1rem'
+                  }}
                   value={formData.categoryId}
                   onChange={e => setFormData({...formData, categoryId: e.target.value})}
                 >
-                  <option value="">Select a category</option>
+                  <option value="" className="bg-popover text-popover-foreground">Select a category</option>
                   {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    <option key={cat.id} value={cat.id} className="bg-popover text-popover-foreground">{cat.name}</option>
                   ))}
                 </select>
               </div>
@@ -269,6 +308,52 @@ export default function AdminProductsPage() {
                   placeholder="Clock speed, VRAM, TDP..." 
                 />
               </div>
+
+              <div className="space-y-4 md:col-span-2 border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base">Technical Specifications</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addAttribute}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Specification
+                  </Button>
+                </div>
+                
+                {formAttributes.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4 bg-muted/50 rounded-lg border border-dashed">
+                    No technical specifications added yet.
+                  </p>
+                )}
+
+                <div className="grid grid-cols-1 gap-3">
+                  {formAttributes.map((attr, index) => (
+                    <div key={index} className="flex gap-3 items-start animate-in slide-in-from-left-2 duration-200">
+                      <div className="flex-1 space-y-1">
+                        <Input 
+                          placeholder="Key (e.g. Socket)" 
+                          value={attr.key}
+                          onChange={e => updateAttribute(index, "key", e.target.value)}
+                        />
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <Input 
+                          placeholder="Value (e.g. AM5)" 
+                          value={attr.value}
+                          onChange={e => updateAttribute(index, "value", e.target.value)}
+                        />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => removeAttribute(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex items-end gap-3 md:col-span-2">
                 <Button type="submit" className="flex-1">
                   {editingProduct ? "Update Product" : "Save Product"}

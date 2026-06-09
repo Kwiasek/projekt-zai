@@ -40,7 +40,7 @@ public class PaymentController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid order amount"));
             }
 
-            String clientSecret = stripeService.createPaymentIntent(amountInCents, "usd");
+            String clientSecret = stripeService.createCheckoutSession(amountInCents, "usd");
             return ResponseEntity.ok(Map.of("clientSecret", clientSecret));
         } catch (StripeException e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

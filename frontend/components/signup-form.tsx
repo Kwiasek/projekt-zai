@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { useState } from "react"
-import { fetchApi } from "@/lib/fetchApi"
+import { useApi } from "@/lib/useApi"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -27,6 +27,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [loading, setLoading] = useState(false);
   
   const router = useRouter();
+  const api = useApi();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +46,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     setError(null);
 
     try {
-      await fetchApi("/api/register", {
+      await api("/api/register", {
         method: "POST",
         body: JSON.stringify({ username, password })
       });

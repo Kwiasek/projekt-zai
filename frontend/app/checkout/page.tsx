@@ -1,67 +1,88 @@
 "use client";
 
-import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
+import { 
+  PaymentElement, 
+  CheckoutElementsProvider,
+  useCheckoutElements
+} from "@stripe/react-stripe-js/checkout";
 import { useCartStore } from "@/lib/cartStore";
-import { useAuthStore } from "@/lib/authStore";
+import { useAuthStore } from "@/components/auth-store-provider";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { fetchApi } from "@/lib/fetchApi";
 import { useRouter } from "next/navigation";
-import { PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { useApi } from "@/lib/useApi";
+import Link from "next/link"
 
-// Placeholder for Stripe Public Key - replace with your actual key in .env
+// Placeholder for Stripe Public Key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
 
-function CheckoutForm() {
-  const stripe = useStripe();
-  const elements = useElements();
+interface DeliveryData {
+  firstName: string;
+  lastName: string;
+  address: string;
+  city: string;
+  zip: string;
+}
+
+function CheckoutForm({ deliveryData }: { deliveryData: DeliveryData }) {
+  const checkout = useCheckoutElements();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const router = useRouter();
   const { items, clearCart } = useCartStore();
-  const { accessToken } = useAuthStore();
+  const api = useApi();
+
+  const validateDelivery = () => {
+    if (!deliveryData.firstName || !deliveryData.lastName || !deliveryData.address || !deliveryData.city || !deliveryData.zip) {
+      setError("Please fill in all delivery information fields.");
+      return false;
+    }
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) return;
+    if (!checkout || checkout.type === 'success') return;
+
+    if (!validateDelivery()) return;
 
     setProcessing(true);
+    setError(null);
 
-    const { error: submitError } = await stripe.confirmPayment({
-      elements,
-      redirect: 'if_required',
-    });
-
-    if (submitError) {
-      setError(submitError.message || "Payment failed");
-      setProcessing(false);
-      return;
-    }
-
-    // Payment succeeded on Stripe's end, now finalize order on our backend
     try {
       const orderItems = items.map(item => ({
         productId: item.id,
         quantity: item.quantity
       }));
 
-      await fetchApi("/api/order", {
+      // Confirm payment using the new checkout.confirm method
+      const { error: confirmError } = await checkout.confirm();
+
+      if (confirmError) {
+        setError(confirmError.message || "Payment failed");
+        setProcessing(false);
+        return;
+      }
+
+      // If confirmation succeeded, we place the order record in our DB
+      await api("/api/order", {
         method: "POST",
-        body: JSON.stringify({ items: orderItems }),
-        token: accessToken || undefined
+        body: JSON.stringify({ 
+          items: orderItems,
+          status: "PAID"
+        })
       });
 
       clearCart();
       router.push("/profile?success=true");
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message || "Order placement failed after payment. Please contact support.");
+        setError(err.message || "Something went wrong.");
       }
       setProcessing(false);
     }
@@ -70,10 +91,10 @@ function CheckoutForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <PaymentElement />
-      {error && <div className="text-destructive text-sm">{error}</div>}
+      {error && <div className="text-destructive text-sm font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20">{error}</div>}
       <Button 
         type="submit" 
-        disabled={!stripe || processing} 
+        disabled={processing} 
         className="w-full rounded-full h-12 text-lg font-semibold"
       >
         {processing ? "Processing..." : "Pay and Place Order"}
@@ -84,29 +105,46 @@ function CheckoutForm() {
 
 export default function CheckoutPage() {
   const { items, getTotalPrice } = useCartStore();
-  const { user, accessToken } = useAuthStore();
+  const { user, _hasHydrated } = useAuthStore();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const api = useApi();
+
+  const [deliveryData, setDeliveryData] = useState({
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    zip: ""
+  });
+
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !_hasHydrated) return;
+
     if (items.length === 0) {
       router.push("/products");
       return;
     }
 
-    // In a real app, you would fetch the PaymentIntent client secret from your backend
-    const getPaymentIntent = async () => {
+    const getCheckoutSession = async () => {
         try {
             const orderItems = items.map(item => ({
                 productId: item.id,
                 quantity: item.quantity
             }));
 
-            const data = await fetchApi("/api/create-payment-intent", { 
+            const data = await api("/api/create-payment-intent", { 
                 method: "POST",
-                body: JSON.stringify({ items: orderItems }),
-                token: accessToken || undefined
+                body: JSON.stringify({ items: orderItems })
             });
             
             if (data.clientSecret) {
@@ -114,13 +152,21 @@ export default function CheckoutPage() {
             }
             setLoading(false);
         } catch (e) {
-            console.error("Failed to fetch payment intent", e);
+            console.error("Failed to fetch checkout session", e);
             setLoading(false);
         }
     };
 
-    getPaymentIntent();
-  }, [items, router, accessToken]);
+    getCheckoutSession();
+  }, [items, router, api, mounted, _hasHydrated]);
+
+  if (!mounted || !_hasHydrated) {
+    return (
+        <div className="container mx-auto py-20 px-4 text-center">
+            <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+        </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -132,6 +178,37 @@ export default function CheckoutPage() {
       </div>
     );
   }
+
+  const handleSimulatedPayment = async () => {
+    if (!deliveryData.firstName || !deliveryData.lastName || !deliveryData.address || !deliveryData.city || !deliveryData.zip) {
+      setValidationError("Please fill in all delivery information fields.");
+      return;
+    }
+
+    setValidationError(null);
+    setLoading(true);
+
+    try {
+      const orderItems = items.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }));
+
+      await api("/api/order", {
+        method: "POST",
+        body: JSON.stringify({ 
+          items: orderItems,
+          status: "PAID"
+        })
+      });
+
+      useCartStore.getState().clearCart();
+      router.push("/profile?success=true");
+    } catch (err) {
+      if (err instanceof Error) alert(err.message);
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="container mx-auto py-10 px-4 max-w-4xl">
@@ -147,25 +224,50 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" placeholder="John" />
+                  <Input 
+                    id="firstName" 
+                    placeholder="John" 
+                    value={deliveryData.firstName}
+                    onChange={e => setDeliveryData({...deliveryData, firstName: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" placeholder="Doe" />
+                  <Input 
+                    id="lastName" 
+                    placeholder="Doe" 
+                    value={deliveryData.lastName}
+                    onChange={e => setDeliveryData({...deliveryData, lastName: e.target.value})}
+                  />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Street Address</Label>
-                <Input id="address" placeholder="123 Computer St" />
+                <Input 
+                  id="address" 
+                  placeholder="123 Computer St" 
+                  value={deliveryData.address}
+                  onChange={e => setDeliveryData({...deliveryData, address: e.target.value})}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
-                  <Input id="city" placeholder="Silicon Valley" />
+                  <Input 
+                    id="city" 
+                    placeholder="Silicon Valley" 
+                    value={deliveryData.city}
+                    onChange={e => setDeliveryData({...deliveryData, city: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="zip">ZIP Code</Label>
-                  <Input id="zip" placeholder="00-000" />
+                  <Input 
+                    id="zip" 
+                    placeholder="00-000" 
+                    value={deliveryData.zip}
+                    onChange={e => setDeliveryData({...deliveryData, zip: e.target.value})}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -181,36 +283,18 @@ export default function CheckoutPage() {
               {loading ? (
                 <div className="py-10 text-center">Initializing payment...</div>
               ) : clientSecret ? (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <CheckoutForm />
-                </Elements>
+                <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
+                  <CheckoutForm deliveryData={deliveryData} />
+                </CheckoutElementsProvider>
               ) : (
                 <div className="space-y-4">
                     <p className="text-sm text-muted-foreground mb-4">
-                        Stripe Payment Intent would be initialized here. 
+                        Stripe Checkout Session would be initialized here. 
                         To use real Stripe, provide `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` and implement backend endpoint.
                     </p>
+                    {validationError && <div className="text-destructive text-sm font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20 mb-4">{validationError}</div>}
                     <Button 
-                        onClick={async () => {
-                            // Simulation of order placement for prototype purposes without real Stripe secret
-                            try {
-                                const orderItems = items.map(item => ({
-                                    productId: item.id,
-                                    quantity: item.quantity
-                                }));
-
-                                await fetchApi("/api/order", {
-                                    method: "POST",
-                                    body: JSON.stringify({ items: orderItems }),
-                                    token: useAuthStore.getState().accessToken || undefined
-                                });
-
-                                useCartStore.getState().clearCart();
-                                router.push("/profile?success=true");
-                            } catch (err) {
-                                if (err instanceof Error) alert(err.message);
-                            }
-                        }}
+                        onClick={handleSimulatedPayment}
                         className="w-full rounded-full h-12 text-lg font-semibold"
                     >
                         Simulate Payment & Place Order
@@ -229,3 +313,4 @@ export default function CheckoutPage() {
     </div>
   );
 }
+

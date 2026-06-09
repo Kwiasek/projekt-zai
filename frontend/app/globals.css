@@ -130,4 +130,10 @@
   html {
     @apply font-sans;
   }
+  select {
+    @apply h-9 rounded-3xl border border-transparent bg-input/50 px-3 py-1 text-sm shadow-sm transition-all focus:outline-none focus:ring-3 focus:ring-ring/30 focus:border-ring text-foreground;
+  }
+  option {
+    @apply bg-popover text-popover-foreground;
+  }
 }

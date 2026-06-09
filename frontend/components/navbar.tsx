@@ -14,23 +14,29 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useCartStore } from "@/lib/cartStore";
-import { fetchApi } from "@/lib/fetchApi";
 import { useAuthStore } from "./auth-store-provider"
+import { useApi } from "@/lib/useApi";
 
 export default function Navbar() {
   const { getTotalItems } = useCartStore();
-  const { user, clearAuth } = useAuthStore(
+  const { user, clearAuth, _hasHydrated } = useAuthStore(
       (state) => state
     );
   const [searchQuery, setSearchQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const api = useApi();
 
-  const cartCount = getTotalItems();
-  const isLoggedIn = !!user;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const cartCount = mounted ? getTotalItems() : 0;
+  const isLoggedIn = (mounted && _hasHydrated) ? !!user : false;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +47,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      await fetchApi("/api/logout", { method: "POST" });
+      await api("/api/logout", { method: "POST" });
     } catch (e) {
       console.error("Logout failed", e);
     } finally {

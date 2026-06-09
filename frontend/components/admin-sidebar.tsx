@@ -29,6 +29,12 @@ export function AdminSidebar() {
       active: pathname === "/admin/products",
     },
     {
+      label: "Categories",
+      icon: LayoutDashboard, // Or another relevant icon
+      href: "/admin/categories",
+      active: pathname === "/admin/categories",
+    },
+    {
       label: "Orders",
       icon: ShoppingCart,
       href: "/admin/orders",

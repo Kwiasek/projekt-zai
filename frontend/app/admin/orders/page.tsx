@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchApi } from "@/lib/fetchApi";
-import { useAuthStore } from "@/components/auth-store-provider";
+import { useApi } from "@/lib/useApi";
 import { 
   Card, 
   CardContent 
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { 
   Table, 
   TableBody, 
@@ -35,12 +33,12 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const { accessToken } = useAuthStore();
+  const api = useApi();
 
   useEffect(() => {
     const loadOrders = async () => {
       try {
-        const data = await fetchApi("/api/orders", { token: accessToken || undefined });
+        const data = await api("/api/orders");
         setOrders(data);
       } catch (e) {
         console.error("Failed to load orders", e);
@@ -50,7 +48,7 @@ export default function AdminOrdersPage() {
     };
 
     loadOrders();
-  }, [accessToken]);
+  }, [api]);
 
   const filteredOrders = orders.filter(order => 
     order.id.toString().includes(searchTerm) || 
@@ -112,9 +110,35 @@ export default function AdminOrdersPage() {
                     </TableCell>
                     <TableCell className="font-semibold">${total.toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge variant={order.status === "PAID" ? "default" : "secondary"}>
-                        {order.status}
-                      </Badge>
+                      <select
+                        className="bg-input/50 text-foreground border border-transparent rounded-3xl p-1 px-3 text-xs focus:ring-3 focus:ring-ring/30 focus:border-ring transition-all appearance-none cursor-pointer pr-8"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 0.5rem center',
+                          backgroundSize: '0.8rem'
+                        }}
+                        value={order.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          try {
+                            await api(`/api/order/${order.id}/status`, {
+                              method: "PUT",
+                              body: JSON.stringify({ status: newStatus })
+                            });
+                            // Update local state
+                            setOrders(orders.map(o => o.id === order.id ? { ...o, status: newStatus } : o));
+                          } catch (err) {
+                            if (err instanceof Error) alert(err.message);
+                          }
+                        }}
+                      >
+                        <option value="PENDING" className="bg-popover text-popover-foreground">PENDING</option>
+                        <option value="PAID" className="bg-popover text-popover-foreground">PAID</option>
+                        <option value="SHIPPED" className="bg-popover text-popover-foreground">SHIPPED</option>
+                        <option value="DELIVERED" className="bg-popover text-popover-foreground">DELIVERED</option>
+                        <option value="CANCELLED" className="bg-popover text-popover-foreground">CANCELLED</option>
+                      </select>
                     </TableCell>
                   </TableRow>
                 );

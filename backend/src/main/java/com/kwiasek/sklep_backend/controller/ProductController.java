@@ -76,6 +76,7 @@ public class ProductController {
             updatedProduct.setPrice(product.getPrice());
             updatedProduct.setStockQuantity(product.getStockQuantity());
             updatedProduct.setCategory(product.getCategory());
+            updatedProduct.setAttributes(product.getAttributes());
             productRepository.save(updatedProduct);
             return ResponseEntity.ok(convertToDto(updatedProduct));
         } else {
@@ -104,6 +105,7 @@ public class ProductController {
         dto.setPrice(product.getPrice());
         dto.setStockQuantity(product.getStockQuantity());
         dto.setCategory(product.getCategory());
+        dto.setAttributes(product.getAttributes());
         if (product.getImages() != null) {
             dto.setImages(product.getImages().stream()
                     .map(img -> new ProductImageDTO(img.getId(), img.getContentType(), img.getDisplayOrder()))
