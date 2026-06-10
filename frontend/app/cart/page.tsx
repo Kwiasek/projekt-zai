@@ -52,7 +52,7 @@ export default function CartPage() {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row gap-6">
                   {/* Image */}
-                  <div className="w-full sm:w-32 aspect-square bg-muted/50 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="w-full sm:w-32 aspect-square bg-muted/50 rounded-lg overflow-hidden shrink-0">
                     {item.imageId ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img 

@@ -82,15 +82,15 @@ export default function Page() {
       {/* Hero Section */}
       <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center overflow-hidden">
         {/* Background with tech-inspired gradient/overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/20 via-background to-background z-0" />
-        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:40px_40px] z-0" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary/20 via-background to-background z-0" />
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-size-[40px_40px] z-0" />
         
         <div className="container relative z-10 px-4 text-center">
           <div className="inline-flex items-center rounded-full border px-3 py-1 text-sm mb-6 bg-background/50 backdrop-blur-sm">
             <span className="flex h-2 w-2 rounded-full bg-primary mr-2 animate-pulse" />
             New RTX 50-series GPUs now in stock
           </div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 pb-2 px-1 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/60 leading-tight">
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter mb-6 pb-2 px-1 bg-clip-text text-transparent bg-linear-to-b from-foreground to-foreground/60 leading-tight">
             Build Your Ultimate Rig
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10">
@@ -138,7 +138,7 @@ export default function Page() {
                   <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors">
                     {category.name}
                   </h3>
-                  <p className="text-muted-foreground mb-6 flex-grow">
+                  <p className="text-muted-foreground mb-6 grow">
                     {category.description}
                   </p>
                   <div className="flex items-center text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
