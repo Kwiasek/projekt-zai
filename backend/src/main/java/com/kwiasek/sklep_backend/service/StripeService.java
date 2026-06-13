@@ -23,7 +23,7 @@ public class StripeService {
         Stripe.apiKey = stripeSecretKey;
     }
 
-    public String createCheckoutSession(Long amount, String currency) throws StripeException {
+    public Session createCheckoutSession(Long amount, String currency) throws StripeException {
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
                 .putExtraParam("ui_mode", "elements")
@@ -40,15 +40,15 @@ public class StripeService {
                                                                 .build()
                                                 )
                                                 .build()
+                                        )
+                                        .build()
                                 )
-                                .build()
-                )
-                .build();
+                                .build();
 
         RequestOptions options = RequestOptions.builder()
                 .build();
 
         Session session = Session.create(params, options);
-        return session.getClientSecret();
+        return session;
     }
 }

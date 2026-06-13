@@ -17,4 +17,5 @@ public class OrderDTO {
     private List<OrderItemDTO> items;
     private OrderStatus status;
     private LocalDateTime createdAt;
+    private String stripeSessionId;
 }

@@ -8,4 +8,5 @@ import java.util.List;
 public class PlaceOrderRequest {
     private List<OrderItemRequest> items;
     private String status;
+    private String stripeSessionId;
 }

@@ -68,6 +68,7 @@ public class OrderController {
 
         Order newOrder = new Order();
         newOrder.setUser(user);
+        newOrder.setStripeSessionId(orderRequest.getStripeSessionId());
         
         if (orderRequest.getStatus() != null) {
             try {
@@ -143,6 +144,7 @@ public class OrderController {
         dto.setUser(new UserResponse(order.getUser()));
         dto.setStatus(order.getStatus());
         dto.setCreatedAt(order.getCreatedAt());
+        dto.setStripeSessionId(order.getStripeSessionId());
         if (order.getItems() != null) {
             dto.setItems(order.getItems().stream()
                     .map(this::convertToDto)

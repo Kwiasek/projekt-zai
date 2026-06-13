@@ -32,6 +32,8 @@ public class Order {
 
     private LocalDateTime createdAt;
 
+    private String stripeSessionId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
