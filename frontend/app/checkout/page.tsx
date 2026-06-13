@@ -20,6 +20,16 @@ import Link from "next/link"
 // Placeholder for Stripe Public Key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_test_placeholder");
 
+const appearance = {
+  theme: "night" as const,
+  labels: "above" as const,
+  variables: {
+    colorBackground: "#18181b",
+    colorPrimary: "#fff",
+    borderRadius: "24px"
+  }
+};
+
 interface DeliveryData {
   firstName: string;
   lastName: string;
@@ -28,7 +38,15 @@ interface DeliveryData {
   zip: string;
 }
 
-function CheckoutForm({ deliveryData }: { deliveryData: DeliveryData }) {
+function CheckoutForm({ 
+  deliveryData, 
+  userEmail, 
+  stripeSessionId 
+}: { 
+  deliveryData: DeliveryData; 
+  userEmail: string; 
+  stripeSessionId: string | null; 
+}) {
   const checkout = useCheckoutElements();
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -47,7 +65,7 @@ function CheckoutForm({ deliveryData }: { deliveryData: DeliveryData }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!checkout || checkout.type === 'success') return;
+    if (!checkout || checkout.type !== 'success') return;
 
     if (!validateDelivery()) return;
 
@@ -60,26 +78,27 @@ function CheckoutForm({ deliveryData }: { deliveryData: DeliveryData }) {
         quantity: item.quantity
       }));
 
-      // Confirm payment using the new checkout.confirm method
-      const { error: confirmError } = await checkout.confirm();
+      // If confirmation succeeded, we place the order record in our DB
+      await api("/api/order", {
+        method: "POST",
+        body: JSON.stringify({ 
+          items: orderItems,
+          status: "PENDING",
+          stripeSessionId: stripeSessionId
+        })
+      });
+
+      // Confirm payment using the new checkout.confirm method (Stripe will redirect the browser)
+      const { error: confirmError } = await (checkout.checkout.confirm({
+        returnUrl: window.location.origin + "/profile?success=true&session_id={CHECKOUT_SESSION_ID}",
+        email: userEmail
+      }) as any);
 
       if (confirmError) {
         setError(confirmError.message || "Payment failed");
         setProcessing(false);
         return;
       }
-
-      // If confirmation succeeded, we place the order record in our DB
-      await api("/api/order", {
-        method: "POST",
-        body: JSON.stringify({ 
-          items: orderItems,
-          status: "PAID"
-        })
-      });
-
-      clearCart();
-      router.push("/profile?success=true");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message || "Something went wrong.");
@@ -107,6 +126,8 @@ export default function CheckoutPage() {
   const { items, getTotalPrice } = useCartStore();
   const { user, _hasHydrated } = useAuthStore();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [stripeSessionId, setStripeSessionId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -121,6 +142,7 @@ export default function CheckoutPage() {
   });
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isRedirectingToProfile, setIsRedirectingToProfile] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -130,7 +152,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!mounted || !_hasHydrated) return;
 
-    if (items.length === 0) {
+    if (items.length === 0 && !clientSecret && !isRedirectingToProfile) {
       router.push("/products");
       return;
     }
@@ -142,13 +164,22 @@ export default function CheckoutPage() {
                 quantity: item.quantity
             }));
 
-            const data = await api("/api/create-payment-intent", { 
-                method: "POST",
-                body: JSON.stringify({ items: orderItems })
-            });
+            const [paymentData, userData] = await Promise.all([
+                api("/api/create-payment-intent", { 
+                    method: "POST",
+                    body: JSON.stringify({ items: orderItems })
+                }),
+                api("/api/user")
+            ]);
             
-            if (data.clientSecret) {
-                setClientSecret(data.clientSecret);
+            if (paymentData.clientSecret) {
+                setClientSecret(paymentData.clientSecret);
+            }
+            if (paymentData.sessionId) {
+                setStripeSessionId(paymentData.sessionId);
+            }
+            if (userData?.userDetails?.email) {
+                setUserEmail(userData.userDetails.email);
             }
             setLoading(false);
         } catch (e) {
@@ -202,6 +233,7 @@ export default function CheckoutPage() {
         })
       });
 
+      setIsRedirectingToProfile(true);
       useCartStore.getState().clearCart();
       router.push("/profile?success=true");
     } catch (err) {
@@ -283,8 +315,8 @@ export default function CheckoutPage() {
               {loading ? (
                 <div className="py-10 text-center">Initializing payment...</div>
               ) : clientSecret ? (
-                <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret }}>
-                  <CheckoutForm deliveryData={deliveryData} />
+                <CheckoutElementsProvider stripe={stripePromise} options={{ clientSecret, elementsOptions: { appearance } } as any}>
+                  <CheckoutForm deliveryData={deliveryData} userEmail={userEmail} stripeSessionId={stripeSessionId} />
                 </CheckoutElementsProvider>
               ) : (
                 <div className="space-y-4">

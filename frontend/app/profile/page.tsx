@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useAuthStore } from "@/components/auth-store-provider";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Package, User as UserIcon, CheckCircle2 } from "lucide-react";
 import { useApi } from "@/lib/useApi"
+import { useCartStore } from "@/lib/cartStore"
+import { API_BASE_URL } from "@/lib/fetchApi"
 
 interface Order {
   id: number;
@@ -32,9 +34,10 @@ interface UserDetails {
   birthDate: string;
 }
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const { user, accessToken, setAuth, _hasHydrated } = useAuthStore((state) => state);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const api = useApi();
   const [orders, setOrders] = useState<Order[]>([]);
   const [details, setDetails] = useState<UserDetails>({
@@ -48,13 +51,62 @@ export default function ProfilePage() {
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const { clearCart } = useCartStore();
+
+  const sessionId = searchParams.get("session_id");
+  const success = searchParams.get("success");
+  const ref = searchParams.get("ref");
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
+    if (success === "true" && sessionId && ref !== "clean") {
+      window.location.replace(window.location.pathname + "?success=true&session_id=" + sessionId + "&ref=clean");
+    }
+  }, [success, sessionId, ref]);
+
+  useEffect(() => {
+    if (success === "true") {
+      clearCart();
+    }
+  }, [success, clearCart]);
+
+  useEffect(() => {
+    if (!mounted || !_hasHydrated || !sessionId) return;
+    if (success === "true" && ref !== "clean") return;
+
+    const verifyPayment = async () => {
+      setVerifyingPayment(true);
+      try {
+        const response = await api(`/api/payment/verify?sessionId=${sessionId}`);
+        if (response && (response.status === "PAID" || response.status === "SUCCESS")) {
+          // reload orders
+          const ordersData = await api("/api/orders");
+          setOrders(ordersData);
+        }
+      } catch (err) {
+        console.error("Verification error:", err);
+      } finally {
+        setVerifyingPayment(false);
+        // Clean URL parameters
+        const params = new URLSearchParams(window.location.search);
+        params.delete("session_id");
+        params.delete("success");
+        params.delete("ref");
+        const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+        router.replace(newUrl);
+      }
+    };
+
+    verifyPayment();
+  }, [sessionId, success, ref, mounted, _hasHydrated, api, router]);
+
+  useEffect(() => {
     if (!mounted || !_hasHydrated) return;
+    if (success === "true" && sessionId && ref !== "clean") return;
 
     if (!user) {
       router.push("/login");
@@ -131,8 +183,18 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {verifyingPayment && (
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6 flex items-center gap-3 animate-pulse">
+          <Loader2 className="h-5 w-5 animate-spin text-primary flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-sm text-foreground">Verifying payment status...</p>
+            <p className="text-xs text-muted-foreground">Please wait a moment while we confirm your payment with Stripe.</p>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="orders" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-100">
+        <TabsList className="grid w-full grid-cols-2 lg:max-w-md h-11">
           <TabsTrigger value="orders">Order History</TabsTrigger>
           <TabsTrigger value="details">My Details</TabsTrigger>
         </TabsList>
@@ -150,32 +212,32 @@ export default function ProfilePage() {
           ) : (
             <div className="grid gap-6">
               {orders.map((order) => (
-                <Card key={order.id} className="overflow-hidden border-muted-foreground/10 hover:border-muted-foreground/20 transition-colors">
-                  <CardHeader className="bg-muted/30 pb-4">
-                    <div className="flex justify-between items-center">
+                <Card key={order.id} className="overflow-hidden border-muted-foreground/10 hover:border-muted-foreground/20 transition-all duration-300 pt-0 pb-0 gap-0">
+                  <CardHeader className="bg-muted/30 py-4 px-6 border-b border-muted-foreground/10">
+                    <div className="flex justify-between items-center w-full">
                       <div>
-                        <CardTitle className="text-lg">Order #{order.id}</CardTitle>
-                        <CardDescription>Placed successfully</CardDescription>
+                        <CardTitle className="text-lg font-bold">Order #{order.id}</CardTitle>
+                        <CardDescription className="text-xs">Placed successfully</CardDescription>
                       </div>
                       <Badge variant={order.status === "PAID" ? "default" : "secondary"}>
                         {order.status}
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-6">
+                  <CardContent className="p-6">
                     <div className="space-y-4">
                       {order.items.map((item) => (
                         <div key={item.id} className="flex justify-between items-center text-sm">
                           <div className="flex gap-2">
-                            <span className="font-medium">{item.product.name}</span>
+                            <span className="font-medium text-foreground">{item.product.name}</span>
                             <span className="text-muted-foreground">x{item.quantity}</span>
                           </div>
-                          <span className="font-semibold">${(item.priceAtPurchase * item.quantity).toFixed(2)}</span>
+                          <span className="font-semibold text-foreground">${(item.priceAtPurchase * item.quantity).toFixed(2)}</span>
                         </div>
                       ))}
-                      <Separator />
+                      <Separator className="my-2" />
                       <div className="flex justify-between items-center pt-2">
-                        <span className="font-bold">Total</span>
+                        <span className="font-bold text-foreground">Total</span>
                         <span className="text-primary font-bold text-lg">
                           ${order.items.reduce((sum, item) => sum + (item.priceAtPurchase * item.quantity), 0).toFixed(2)}
                         </span>
@@ -263,5 +325,18 @@ export default function ProfilePage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Loading your profile...</p>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
   );
 }
